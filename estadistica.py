@@ -250,7 +250,13 @@ if not valid_variance:
 
 normal_ok=np.isfinite(sh_p) and sh_p>alpha
 variance_ok=np.isfinite(lev_p) and lev_p>alpha
-suggestion="ANOVA clásico" if normal_ok and variance_ok else ("ANOVA de Welch" if normal_ok else "Kruskal-Wallis (exploratorio)")
+suggestion = (
+    "ANOVA clásico"
+    if normal_ok and variance_ok
+    else "ANOVA de Welch"
+    if normal_ok
+    else "Kruskal-Wallis"
+)
 st.info(f"Ruta orientativa: **{suggestion}**. No es una decisión automática definitiva; considerá diseño, Q-Q, tamaños de muestra y naturaleza de la variable.")
 
 method=st.selectbox("Prueba principal para interpretar",["ANOVA clásico","ANOVA de Welch","Kruskal-Wallis"],index=["ANOVA clásico","ANOVA de Welch","Kruskal-Wallis"].index(suggestion))
