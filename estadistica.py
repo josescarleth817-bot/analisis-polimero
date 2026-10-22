@@ -12,7 +12,7 @@ from statsmodels.stats.multicomp import pairwise_tukeyhsd
 from statsmodels.stats.oneway import anova_oneway
 
 st.set_page_config(page_title="Análisis de polímeros", page_icon="🧪", layout="wide")
-st.title("🧪 Análisis estadístico de carga de ruptura en polímeros")
+st.title("Análisis estadístico de carga de ruptura en polímeros")
 st.caption("LDPE · HDPE · Bioplástico de almidón | Investigación de Estadística II")
 st.info("La carga de ruptura medida con pesas escalonadas es un intervalo, no una fuerza exacta. Las pruebas inferenciales con un valor representativo son análisis exploratorios y requieren interpretación cautelosa.")
 
