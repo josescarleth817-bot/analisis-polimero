@@ -4,3 +4,5 @@ numpy
 scipy
 matplotlib
 openpyxl
+statsmodels
+scikit-posthocs
