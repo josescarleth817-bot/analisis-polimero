@@ -15,8 +15,14 @@ st.set_page_config(page_title="Análisis de polímeros", page_icon="🧪", layou
 
 st.markdown("""
 <style>
+    /* Fondo de la aplicación */
     .stApp {
-        background-color: #F8F2F6;
+        background-color: #E9DEF1;
+    }
+
+    /* Color del título principal */
+    h1 {
+        color: #5A4875 !important;
     }
 </style>
 """, unsafe_allow_html=True)
