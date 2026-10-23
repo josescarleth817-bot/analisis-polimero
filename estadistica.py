@@ -12,6 +12,14 @@ from statsmodels.stats.multicomp import pairwise_tukeyhsd
 from statsmodels.stats.oneway import anova_oneway
 
 st.set_page_config(page_title="Análisis de polímeros", page_icon="🧪", layout="wide")
+
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #FEFAF8;
+    }
+</style>
+""", unsafe_allow_html=True)
 st.image("Banner.png", use_container_width=True)
 st.title("Análisis estadístico de carga de ruptura en polímeros")
 st.caption("LDPE · HDPE · Bioplástico de almidón | Investigación de Estadística II")
