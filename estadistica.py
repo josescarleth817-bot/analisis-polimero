@@ -12,7 +12,7 @@ from statsmodels.stats.multicomp import pairwise_tukeyhsd
 from statsmodels.stats.oneway import anova_oneway
 
 st.set_page_config(page_title="Análisis de polímeros", page_icon="🧪", layout="wide")
-st.title("Análisis estadístico de carga de ruptura en polímeros")
+st.title("🧪 Análisis estadístico de carga de ruptura en polímeros")
 st.caption("LDPE · HDPE · Bioplástico de almidón | Investigación de Estadística II")
 st.info("La carga de ruptura medida con pesas escalonadas es un intervalo, no una fuerza exacta. Las pruebas inferenciales con un valor representativo son análisis exploratorios y requieren interpretación cautelosa.")
 
@@ -240,6 +240,64 @@ with warnings.catch_warnings(record=True) as caught:
 
 st.caption("p > α no demuestra que el supuesto sea verdadero; los gráficos y el diseño también deben revisarse. Bartlett es sensible a la falta de normalidad.")
 
+def generar_interpretacion(groups, summary, method, p_global, posthoc, alpha, normal_ok, variance_ok):
+    """Genera texto descriptivo e inferencial, sin inferir causalidad ni equivalencia."""
+    orden = sorted(groups, key=lambda x: float(np.mean(x[1])), reverse=True)
+    medias = {name: float(np.mean(a)) for name, a in groups}
+    mayor, menor = orden[0][0], orden[-1][0]
+    detalles = "; ".join(f"{name}: {medias[name]:.4g} N" for name, _ in orden)
+    lineas = [
+        "INTERPRETACIÓN AUTOMÁTICA (REVISAR ANTES DE CITAR)",
+        f"Se analizaron {len(groups)} grupos independientes mediante {method} (α = {alpha:g}).",
+        f"Medias observadas, de mayor a menor: {detalles}.",
+        f"El grupo con mayor media observada fue {mayor}; el de menor media fue {menor}. "
+        "Este orden es descriptivo y no prueba superioridad estadística.",
+        ("Shapiro-Wilk no detectó evidencia suficiente contra la normalidad de los residuos. "
+         if normal_ok else "La normalidad de los residuos no quedó respaldada por el criterio automático. ") +
+        ("Levene no detectó evidencia suficiente de varianzas diferentes." if variance_ok else
+         "Levene señaló heterogeneidad o no produjo un resultado válido."),
+    ]
+    if not np.isfinite(p_global):
+        lineas.append("La prueba global no produjo un valor p válido: no es posible concluir significancia.")
+        return "\n\n".join(lineas)
+    if p_global < alpha:
+        conclusion = ("existen diferencias entre al menos dos medias" if method != "Kruskal-Wallis" else
+                      "existen diferencias entre las distribuciones de al menos dos grupos")
+        lineas.append(f"La prueba global fue significativa (p = {p_global:.4g}): hay evidencia de que {conclusion}.")
+    else:
+        lineas.append(f"La prueba global no fue significativa (p = {p_global:.4g}): no se encontró evidencia suficiente de diferencias entre grupos. Esto no demuestra igualdad.")
+    if posthoc is not None and not posthoc.empty:
+        if method == "ANOVA clásico":
+            c1, c2, pc = "group1", "group2", "p-adj"
+            nombre = "Tukey HSD"
+        elif method == "ANOVA de Welch":
+            c1, c2, pc = "Grupo A", "Grupo B", "p ajustado"
+            nombre = "Games-Howell"
+        else:
+            c1, c2, pc = "Grupo A", "Grupo B", "p Holm"
+            nombre = "Dunn-Holm"
+        lineas.append(f"Comparaciones posteriores ({nombre}):")
+        for _, r in posthoc.iterrows():
+            a, b = str(r[c1]), str(r[c2])
+            pv = pd.to_numeric(r[pc], errors="coerce")
+            if not np.isfinite(pv):
+                lineas.append(f"• {a} frente a {b}: comparación no válida.")
+            elif pv < alpha:
+                if method == "Kruskal-Wallis":
+                    lineas.append(f"• {a} frente a {b}: diferencia significativa de rangos (p ajustado = {pv:.4g}); no implica necesariamente diferencia de medias.")
+                else:
+                    alto = a if medias[a] > medias[b] else b
+                    lineas.append(f"• {a} frente a {b}: diferencia significativa (p ajustado = {pv:.4g}); {alto} tuvo mayor media observada.")
+            else:
+                lineas.append(f"• {a} frente a {b}: sin evidencia suficiente de diferencia (p ajustado = {pv:.4g}).")
+    else:
+        lineas.append("No se generaron comparaciones post hoc; no se atribuyen diferencias a parejas concretas.")
+    lineas.append("Estas conclusiones son estadísticas y se limitan a los datos cargados. "
+                  "La interpretación científica requiere considerar el diseño, los supuestos y la procedencia real o simulada de los datos. "
+                  "La carga de ruptura en N no equivale por sí sola a resistencia a la tracción en MPa.")
+    return "\n\n".join(lineas)
+
+
 st.subheader("5. Contrastes inferenciales")
 all_a=[a for _,a in groups]
 labels=np.concatenate([[name]*len(a) for name,a in groups])
@@ -250,17 +308,13 @@ if not valid_variance:
 
 normal_ok=np.isfinite(sh_p) and sh_p>alpha
 variance_ok=np.isfinite(lev_p) and lev_p>alpha
-suggestion = (
-    "ANOVA clásico"
-    if normal_ok and variance_ok
-    else "ANOVA de Welch"
-    if normal_ok
-    else "Kruskal-Wallis"
-)
+suggestion="ANOVA clásico" if normal_ok and variance_ok else ("ANOVA de Welch" if normal_ok else "Kruskal-Wallis")
 st.info(f"Ruta orientativa: **{suggestion}**. No es una decisión automática definitiva; considerá diseño, Q-Q, tamaños de muestra y naturaleza de la variable.")
 
 method=st.selectbox("Prueba principal para interpretar",["ANOVA clásico","ANOVA de Welch","Kruskal-Wallis"],index=["ANOVA clásico","ANOVA de Welch","Kruskal-Wallis"].index(suggestion))
 posthoc=None
+reporte_texto=None
+p=np.nan
 try:
     if method=="ANOVA clásico":
         stat,p=stats.f_oneway(*all_a)
@@ -291,10 +345,16 @@ try:
             st.write("**Dunn con ajuste Holm:**")
     if posthoc is not None:st.dataframe(posthoc,use_container_width=True)
     st.success("Se rechaza H₀ al nivel α especificado: hay evidencia estadística de diferencias entre grupos." if p<alpha else "No se rechaza H₀: no hay evidencia estadística suficiente para afirmar diferencias entre grupos. Esto no demuestra igualdad.")
+    reporte_texto = generar_interpretacion(groups, summary, method, p, posthoc, alpha, normal_ok, variance_ok)
+    st.subheader("6. Interpretación automática")
+    st.caption("Texto generado a partir de los resultados; verificar antes de incorporarlo a un informe.")
+    st.text_area("Reporte descriptivo e inferencial", value=reporte_texto, height=360)
+    st.download_button("📄 Descargar interpretación (.txt)", reporte_texto.encode("utf-8"),
+                       "interpretacion_estadistica.txt", mime="text/plain")
 except Exception as e:
     st.error(f"No se pudo completar la prueba: {e}")
 
-st.subheader("6. Exportar resultados")
+st.subheader("7. Exportar resultados")
 result_df=pd.DataFrame(results)
 output=io.BytesIO()
 with pd.ExcelWriter(output,engine="openpyxl") as writer:
@@ -302,6 +362,8 @@ with pd.ExcelWriter(output,engine="openpyxl") as writer:
     result_df.to_excel(writer,sheet_name="Pruebas",index=False)
     pd.DataFrame({"Material":labels,"Fuerza estimada (N)":values}).to_excel(writer,sheet_name="Datos_analizados",index=False)
     if posthoc is not None:posthoc.to_excel(writer,sheet_name="Post_hoc",index=False)
+    if reporte_texto:
+        pd.DataFrame({"Interpretación":reporte_texto.split("\n\n")}).to_excel(writer,sheet_name="Interpretacion",index=False)
 st.download_button("📥 Descargar tablas Excel",output.getvalue(),"resultados_polimeros.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 zipbuf=io.BytesIO()
 with zipfile.ZipFile(zipbuf,"w",compression=zipfile.ZIP_DEFLATED) as z:
